@@ -1,29 +1,268 @@
-public static String calculateHash(Block block) {
-  if (block != null) {
-    MessageDigest digest = null;
+package fr.toutsurlebitcoin.myblockchain;
 
-    try {
-      digest = MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      return null;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Date;
+
+public class Block {
+
+  private int index;
+  private long timestamp;
+  private String hash;
+  private String previousHash;
+  private String data;
+  private int nonce;
+	
+  public Block(int index, long timestamp, String previousHash, String data) {
+    this.index = index;
+    this.timestamp = timestamp;
+    this.previousHash = previousHash;
+    this.data = data;
+    nonce = 0;
+    hash = Block.calculateHash(this);
+  }
+
+  public int getIndex() {
+    return index;
+  }
+
+  public long getTimestamp() {
+    return timestamp;
+  }
+
+  public String getHash() {
+    return hash;
+  }
+
+  public String getPreviousHash() {
+    return previousHash;
+  }
+
+  public String getData() {
+    return data;
+  }
+
+  public String str() {
+    return index + timestamp + previousHash + data + nonce;
+  }
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append("Block #").append(index).append(" [previousHash : ").append(previousHash).append(", ").
+    append("timestamp : ").append(new Date(timestamp)).append(", ").append("data : ").append(data).append(", ").
+    append("hash : ").append(hash).append("]");
+    return builder.toString();
+  }
+	
+  public static String calculateHash(Block block) {
+    if (block != null) {
+      MessageDigest digest = null;
+
+      try {
+        digest = MessageDigest.getInstance("SHA-256");
+      } catch (NoSuchAlgorithmException e) {
+        return null;
+      }
+			
+      String txt = block.str();
+      final byte bytes[] = digest.digest(txt.getBytes());
+      final StringBuilder builder = new StringBuilder();
+			
+      for (final byte b : bytes) {
+        String hex = Integer.toHexString(0xff & b);
+
+        if (hex.length() == 1) {
+          builder.append('0');
+        }
+				
+        builder.append(hex);
+      }
+			
+      return builder.toString();
+    }
+	  
+    return null;
+  }
+
+   public void mineBlock(int difficulty) {
+     nonce = 0;
+		
+     while (!getHash().substring(0,  difficulty).equals(Utils.zeros(difficulty))) {
+       nonce++;
+       hash = Block.calculateHash(this);
+     }
+  }
+	
+}
+
+public class Blockchain {
+
+  private int difficulty;
+  private List<Block> blocks;
+  
+}
+
+public Block latestBlock() {
+  return blocks.get(blocks.size() - 1);
+}
+
+public Block newBlock(String data) {
+  Block latestBlock = latestBlock();
+  return new Block(latestBlock.getIndex() + 1, System.currentTimeMillis(),
+      latestBlock.getHash(), data);
+}
+
+public void addBlock(Block b) {
+  if (b != null) {
+    b.mineBlock(difficulty);
+    blocks.add(b);
+  }
+}
+
+package fr.toutsurlebitcoin.myblockchain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Blockchain {
+
+  private int difficulty;
+  private List<Block> blocks;
+
+  public Blockchain(int difficulty) {
+    this.difficulty = difficulty;
+    blocks = new ArrayList<>();
+    // create the first block
+    Block b = new Block(0, System.currentTimeMillis(), null, "First Block");
+    b.mineBlock(difficulty);
+    blocks.add(b);
+  }
+
+  public int getDifficulty() {
+    return difficulty;
+  }
+
+  public Block latestBlock() {
+    return blocks.get(blocks.size() - 1);
+  }
+
+  public Block newBlock(String data) {
+    Block latestBlock = latestBlock();
+    return new Block(latestBlock.getIndex() + 1, System.currentTimeMillis(),
+        latestBlock.getHash(), data);
+  }
+
+  public void addBlock(Block b) {
+    if (b != null) {
+      b.mineBlock(difficulty);
+      blocks.add(b);
+    }
+  }
+
+  public boolean isFirstBlockValid() {
+    Block firstBlock = blocks.get(0);
+
+    if (firstBlock.getIndex() != 0) {
+      return false;
     }
 
-    String txt = block.str();
-    final byte bytes[] = digest.digest(txt.getBytes());
-    final StringBuilder builder = new StringBuilder();
+    if (firstBlock.getPreviousHash() != null) {
+      return false;
+    }
 
-    for (final byte b : bytes) {
-      String hex = Integer.toHexString(0xff & b);
+    if (firstBlock.getHash() == null || 
+          !Block.calculateHash(firstBlock).equals(firstBlock.getHash())) {
+      return false;
+    }
 
-      if (hex.length() == 1) {
-        builder.append('0');
+    return true;
+  }
+
+  public boolean isValidNewBlock(Block newBlock, Block previousBlock) {
+    if (newBlock != null  &&  previousBlock != null) {
+      if (previousBlock.getIndex() + 1 != newBlock.getIndex()) {
+        return false;
       }
 
-      builder.append(hex);
+      if (newBlock.getPreviousHash() == null  ||  
+	    !newBlock.getPreviousHash().equals(previousBlock.getHash())) {
+        return false;
+      }
+
+      if (newBlock.getHash() == null  ||  
+	    !Block.calculateHash(newBlock).equals(newBlock.getHash())) {
+        return false;
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  public boolean isBlockChainValid() {
+    if (!isFirstBlockValid()) {
+      return false;
+    }
+
+    for (int i = 1; i < blocks.size(); i++) {
+      Block currentBlock = blocks.get(i);
+      Block previousBlock = blocks.get(i - 1);
+
+      if (!isValidNewBlock(currentBlock, previousBlock)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+
+    for (Block block : blocks) {
+      builder.append(block).append("\n");
     }
 
     return builder.toString();
   }
 
-  return null;
 }
+
+package fr.toutsurlebitcoin.myblockchain;
+
+public class main1 {
+
+  public static void main(String[] args) {
+    Blockchain blockchain = new Blockchain(4);
+    blockchain.addBlock(blockchain.newBlock("Tout sur le Bitcoin"));
+    blockchain.addBlock(blockchain.newBlock("Sylvain Saurel"));
+    blockchain.addBlock(blockchain.newBlock("https://www.toutsurlebitcoin.fr"));
+  
+    System.out.println("Blockchain valid ? " + blockchain.isBlockChainValid());
+    System.out.println(blockchain);
+  }
+
+}
+
+package fr.toutsurlebitcoin.myblockchain;
+
+public class Main {
+
+  public static void main(String[] args) {
+    Blockchain blockchain = new Blockchain(4);
+    blockchain.addBlock(blockchain.newBlock("Tout sur le Bitcoin"));
+    blockchain.addBlock(blockchain.newBlock("Sylvain Saurel"));
+    blockchain.addBlock(blockchain.newBlock("https://www.toutsurlebitcoin.fr"));
+
+    System.out.println("Blockchain valid ? " + blockchain.isBlockChainValid());
+    System.out.println(blockchain);
+
+    // add an invalid block to corrupt Blockchain
+    blockchain.addBlock(new Block(15, System.currentTimeMillis(), "aaaabbb", "Block invalid"));
+
+    System.out.println("Blockchain valid ? " + blockchain.isBlockChainValid());
+  }
+	
+}
+
